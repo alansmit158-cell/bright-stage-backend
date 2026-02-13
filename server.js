@@ -28,6 +28,12 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// Request logging middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 const io = new Server(server, {
     cors: {
         origin: ["http://localhost:5173", "http://localhost:3000", "http://192.168.1.16:8081", "http://localhost:8081", "http://192.168.100.153:8081", "http://192.168.100.153:5173"],
@@ -114,6 +120,10 @@ app.use('/api/subcontracted', subcontractedRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/carriers', require('./routes/carrierRoutes'));
 app.use('/api/delivery-notes', require('./routes/deliveryNoteRoutes'));
+
+app.get('/api/test-connection', (req, res) => {
+    res.json({ success: true, message: "Backend is reachable!", time: new Date().toISOString() });
+});
 
 // Get All Users - Accessible to all authenticated users for team selection
 app.get('/api/users', protect, async (req, res) => {
@@ -1495,7 +1505,12 @@ app.get('/api/messages', async (req, res) => {
 });
 
 // Start Server (Socket.io + Express)
-const SERVER_PORT = process.env.PORT || 5000;
-server.listen(SERVER_PORT, () => {
-    console.log(`Server & Socket.io running on port ${SERVER_PORT}`);
-});
+if (require.main === module) {
+    const SERVER_PORT = process.env.PORT || 5000;
+    server.listen(SERVER_PORT, () => {
+        console.log(`Server & Socket.io running on port ${SERVER_PORT}`);
+    });
+}
+
+// Export the Express app for Vercel
+module.exports = app;
