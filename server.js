@@ -320,13 +320,13 @@ app.get('/api/inventory/:id/history', protect, async (req, res) => {
 // Excel Import Route
 const multer = require('multer');
 const xlsx = require('xlsx');
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ storage: multer.memoryStorage() });
 
 app.post('/api/inventory/import', upload.single('file'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-        const workbook = xlsx.readFile(req.file.path);
+        const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const data = xlsx.utils.sheet_to_json(sheet);
@@ -371,9 +371,7 @@ app.post('/api/inventory/import', upload.single('file'), async (req, res) => {
             }
         }
 
-        // Cleanup uploaded file
-        const fs = require('fs');
-        fs.unlinkSync(req.file.path);
+        // No cleanup needed for memory storage
 
         res.json({ message: 'Import successful', added: addedCount, updated: updatedCount });
     } catch (err) {
