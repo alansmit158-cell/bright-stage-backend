@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const User = require('./models/User');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const seedAdmin = async () => {
@@ -8,7 +10,7 @@ const seedAdmin = async () => {
 
         const existingAdmin = await User.findOne({ email: 'admin@brightstage.com' });
         if (existingAdmin) {
-            console.log("Admin already exists");
+            console.log("Admin already exists (admin@brightstage.com)");
             process.exit(0);
         }
 
@@ -19,7 +21,8 @@ const seedAdmin = async () => {
             name: 'System Admin',
             email: 'admin@brightstage.com',
             password: hashedPassword,
-            role: 'Admin',
+            role: 'Founder', // Use Founder role to ensure full access
+            isActive: true,
             points: 1000
         });
 
@@ -30,7 +33,8 @@ const seedAdmin = async () => {
     } catch (err) {
         console.error("Error seeding admin:", err);
     } finally {
-        mongoose.connection.close();
+        await mongoose.connection.close();
+        process.exit(0);
     }
 };
 

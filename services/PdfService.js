@@ -344,6 +344,76 @@ class PdfService {
         doc.fontSize(16).text(title, 50, 100);
     }
 
+    generateDeliveryNote(note, stream, companyId = 'bright') {
+        const doc = new PDFDocument({ margin: 50 });
+        doc.pipe(stream);
+
+        this.generateHeader(doc, "BON DE LIVRAISON", companyId);
+
+        // BL Number & Date
+        doc.fontSize(10).font("Helvetica-Bold").text(`Nº: ${note.number}`, 400, 100);
+        doc.font("Helvetica").text(`Date: ${new Date(note.date).toLocaleDateString('fr-FR')}`, 400, 115);
+
+        // Project / Client Info
+        doc.fontSize(10).font("Helvetica-Bold").text("Projet / Chantier:", 50, 130);
+        doc.font("Helvetica").text(note.project?.eventName || 'N/A');
+        doc.text(note.project?.siteName || '');
+        doc.text(note.project?.siteAddress || '');
+        doc.moveDown();
+
+        // Transport & Carrier Info
+        const boxY = 190;
+        doc.rect(50, boxY, 500, 80).stroke();
+        doc.font("Helvetica-Bold").text("Informations Transporteur / Chauffeur", 60, boxY + 10);
+        doc.font("Helvetica");
+        doc.text(`Nom: ${note.driverName || '-'}`, 60, boxY + 30);
+        doc.text(`Tél: ${note.driverPhone || '-'}`, 60, boxY + 45);
+        doc.text(`CIN: ${note.driverCin || '-'}`, 60, boxY + 60);
+
+        doc.text(`Véhicule: ${note.vehicleModel || '-'}`, 300, boxY + 30);
+        doc.text(`Matricule: ${note.vehiclePlate || '-'}`, 300, boxY + 45);
+
+        // Items Table
+        const tableTop = 290;
+        doc.font("Helvetica-Bold");
+        doc.text("Désignation / Item", 50, tableTop);
+        doc.text("Quantité / Qty", 450, tableTop);
+        doc.font("Helvetica");
+
+        let y = tableTop + 20;
+        doc.moveTo(50, y - 5).lineTo(550, y - 5).stroke();
+
+        (note.items || []).forEach(item => {
+            if (y > 700) {
+                doc.addPage();
+                y = 50;
+                doc.font("Helvetica-Bold");
+                doc.text("Désignation / Item", 50, y);
+                doc.text("Quantité / Qty", 450, y);
+                doc.font("Helvetica");
+                y += 20;
+            }
+            doc.text(item.name, 50, y);
+            doc.text(item.quantity.toString(), 450, y);
+            y += 20;
+        });
+
+        // Signatures
+        const footerY = Math.max(y + 40, 650);
+        doc.font("Helvetica-Bold");
+        doc.text("Cachet et Signature Magasin", 50, footerY);
+        doc.text("Signature Chauffeur / Client", 350, footerY);
+
+        doc.rect(50, footerY + 15, 200, 60).stroke();
+        doc.rect(350, footerY + 15, 200, 60).stroke();
+
+        if (note.notes) {
+            doc.fontSize(10).font("Helvetica-Oblique").text(`Notes: ${note.notes}`, 50, footerY - 30);
+        }
+
+        doc.end();
+    }
+
     generateInterSiteTransfer(data, stream) {
         const doc = new PDFDocument();
         doc.pipe(stream);
