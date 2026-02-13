@@ -28,6 +28,11 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// Basic health check for Vercel
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'ok', environment: process.env.NODE_ENV || 'development' });
+});
+
 // Request logging middleware
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
