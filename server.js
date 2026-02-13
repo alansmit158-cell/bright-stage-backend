@@ -39,41 +39,44 @@ app.use((req, res, next) => {
     next();
 });
 
-const io = new Server(server, {
-    cors: {
-        origin: ["http://localhost:5173", "http://localhost:3000", "http://192.168.1.16:8081", "http://localhost:8081", "http://192.168.100.153:8081", "http://192.168.100.153:5173"],
-        methods: ["GET", "POST"],
-        credentials: true
-    }
-});
+const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL;
+let io;
 
-// Socket.io Connection Logic
-io.on('connection', (socket) => {
-    console.log(`User Connected: ${socket.id}`);
-
-    // Join Global Chat
-    socket.on('join_chat', (data) => {
-        socket.join('general');
-        console.log(`User ${data?.name || socket.id} joined general chat`);
-    });
-
-    // Handle Message
-    socket.on('send_message', async (data) => {
-        // Data: { sender: _id, senderName: "Name", content: "Msg", room: "general" }
-        try {
-            const newMessage = new Message(data);
-            await newMessage.save();
-            // Broadcast to room
-            io.to(data.room || 'general').emit('receive_message', data);
-        } catch (err) {
-            console.error("Error saving message:", err);
+if (!isVercel) {
+    io = new Server(server, {
+        cors: {
+            origin: ["http://localhost:5173", "http://localhost:3000", "http://192.168.1.16:8081", "http://localhost:8081", "http://192.168.100.153:8081", "http://192.168.100.153:5173"],
+            methods: ["GET", "POST"],
+            credentials: true
         }
     });
 
-    socket.on('disconnect', () => {
-        console.log("User Disconnected", socket.id);
+    // Socket.io Connection Logic
+    io.on('connection', (socket) => {
+        console.log(`User Connected: ${socket.id}`);
+
+        // Join Global Chat
+        socket.on('join_chat', (data) => {
+            socket.join('general');
+            console.log(`User ${data?.name || socket.id} joined general chat`);
+        });
+
+        // Handle Message
+        socket.on('send_message', async (data) => {
+            try {
+                const newMessage = new Message(data);
+                await newMessage.save();
+                io.to(data.room || 'general').emit('receive_message', data);
+            } catch (err) {
+                console.error("Error saving message:", err);
+            }
+        });
+
+        socket.on('disconnect', () => {
+            console.log("User Disconnected", socket.id);
+        });
     });
-});
+}
 
 
 // Database Connection
