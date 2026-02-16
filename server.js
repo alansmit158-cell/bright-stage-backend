@@ -57,8 +57,7 @@ app.get('/api/health', (req, res) => {
         environment: process.env.NODE_ENV || 'production',
         dbConnected: mongoose.connection.readyState === 1,
         dbError: lastDbError,
-        hasUri: !!process.env.MONGODB_URI,
-        envKeys: Object.keys(process.env).filter(k => !k.includes('SECRET') && !k.includes('TOKEN') && !k.includes('KEY'))
+        hasUri: !!process.env.MONGODB_URI
     });
 });
 
