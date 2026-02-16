@@ -15,6 +15,16 @@ const Message = require('./models/Message'); // Import Message Model
 const { protect, authorize } = require('./middleware/authMiddleware');
 const Attendance = require('./models/Attendance'); // Import Attendance for Rest Check
 
+/**
+ * @typedef {Object} AuthUser
+ * @property {*} _id
+ * @property {string} role
+ * @property {string} name
+ * @property {string} [username]
+ * 
+ * @typedef {import('express').Request & { user: AuthUser }} AuthRequest
+ */
+
 const app = express();
 const server = http.createServer(app); // Create HTTP Server
 
@@ -29,8 +39,26 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // Basic health check for Vercel
+app.get('/', (req, res) => {
+    res.status(200).send(`
+        <div style="font-family: sans-serif; text-align: center; padding: 50px; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; justify-content: center;">
+            <h1 style="color: #ffa500; font-size: 3rem; margin-bottom: 10px;">BRIGHT STAGE</h1>
+            <p style="font-size: 1.2rem;">The Production Backend is <strong>ONLINE</strong>.</p>
+            <p style="color: #888;">API Endpoint: <code>/api</code></p>
+            <div style="margin: 30px auto; width: 50px; hieght: 2px; background: #ffa500;"></div>
+            <p><small style="color: #555;">v1.0.1 - Running on Vercel Cloud</small></p>
+        </div>
+    `);
+});
+
 app.get('/api/health', (req, res) => {
-    res.status(200).json({ status: 'ok', environment: process.env.NODE_ENV || 'development' });
+    res.status(200).json({
+        status: 'ok',
+        environment: process.env.NODE_ENV || 'development',
+        dbConnected: mongoose.connection.readyState === 1,
+        dbError: lastDbError,
+        hasUri: !!process.env.MONGODB_URI
+    });
 });
 
 // Request logging middleware
@@ -80,9 +108,16 @@ if (!isVercel) {
 
 
 // Database Connection
+let lastDbError = null;
 mongoose.connect(process.env.MONGODB_URI, { family: 4 })
-    .then(() => console.log('MongoDB Connected'))
-    .catch(err => console.error('MongoDB Connection Error:', err));
+    .then(() => {
+        console.log('MongoDB Connected');
+        lastDbError = null;
+    })
+    .catch(err => {
+        console.error('MongoDB Connection Error:', err);
+        lastDbError = err.message;
+    });
 
 mongoose.connection.on('error', err => {
     console.error('MongoDB runtime error:', err);
@@ -298,7 +333,7 @@ app.get('/api/inventory/:id/history', protect, async (req, res) => {
             return {
                 projectId: p._id,
                 eventName: p.eventName,
-                clientName: p.client?.name || p.clientName || 'Unknown',
+                clientName: p.client?.name || 'Unknown',
                 startDate: p.dates?.start,
                 endDate: p.dates?.end,
                 status: p.status,
@@ -400,7 +435,8 @@ const googleCalendarService = require('./services/GoogleCalendarService');
 
 // Get All Projects
 // Get All Projects
-app.get('/api/projects', protect, async (req, res) => {
+// Get All Projects
+app.get('/api/projects', protect, async (/** @type {AuthRequest} */ req, res) => {
     try {
         let query = {};
 
@@ -428,7 +464,8 @@ app.get('/api/projects', protect, async (req, res) => {
 });
 
 // Create Project - Founder, Manager, Site Manager
-app.post('/api/projects', protect, authorize('Founder', 'Manager', 'Site Manager'), async (req, res) => {
+// Create Project - Founder, Manager, Site Manager
+app.post('/api/projects', protect, authorize('Founder', 'Manager', 'Site Manager'), async (/** @type {AuthRequest} */ req, res) => {
     try {
         const projectData = {
             ...req.body,
@@ -446,7 +483,7 @@ app.post('/api/projects', protect, authorize('Founder', 'Manager', 'Site Manager
         // Sync with Google Calendar
         // We do this asynchronously (don't await) so we don't block the UI if Google is slow
         googleCalendarService.addProjectEvent(populatedProject)
-            .then(() => console.log(`Project ${savedProject.projectName} synced to Google Calendar.`))
+            .then(() => console.log(`Project ${savedProject.eventName} synced to Google Calendar.`))
             .catch(err => console.error("Calendar Sync Failed:", err));
 
         res.status(201).json(savedProject);
@@ -456,7 +493,7 @@ app.post('/api/projects', protect, authorize('Founder', 'Manager', 'Site Manager
 });
 
 // Get Project by ID
-app.get('/api/projects/:id', async (req, res) => {
+app.get('/api/projects/:id', protect, async (/** @type {AuthRequest} */ req, res) => {
     try {
         const project = await Project.findById(req.params.id).populate('items.inventoryItem');
         if (!project) return res.status(404).json({ error: 'Project not found' });
@@ -467,7 +504,7 @@ app.get('/api/projects/:id', async (req, res) => {
 });
 
 // Update Project
-app.put('/api/projects/:id', protect, async (req, res) => {
+app.put('/api/projects/:id', protect, async (/** @type {AuthRequest} */ req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
@@ -507,7 +544,7 @@ app.put('/api/projects/:id', protect, async (req, res) => {
 // --- Validation & Locking Endpoints ---
 
 // Submit for Validation (Locks the project)
-app.post('/api/projects/:id/lock', protect, async (req, res) => {
+app.post('/api/projects/:id/lock', protect, async (/** @type {AuthRequest} */ req, res) => {
     try {
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ error: 'Project not found' });
@@ -524,7 +561,7 @@ app.post('/api/projects/:id/lock', protect, async (req, res) => {
 });
 
 // Unlock Project (Admin Only)
-app.post('/api/projects/:id/unlock', protect, authorize('Founder', 'Manager', 'Storekeeper'), async (req, res) => {
+app.post('/api/projects/:id/unlock', protect, authorize('Founder', 'Manager', 'Storekeeper'), async (/** @type {AuthRequest} */ req, res) => {
     try {
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ error: 'Project not found' });
@@ -587,7 +624,7 @@ app.post('/api/projects/:id/validate-manifest', protect, authorize('Founder', 'M
     }
 });
 
-app.post('/api/projects/:id/cancel-validation', protect, authorize('Founder', 'Manager', 'Storekeeper'), async (req, res) => {
+app.post('/api/projects/:id/cancel-validation', protect, authorize('Founder', 'Manager', 'Storekeeper'), async (/** @type {AuthRequest} */ req, res) => {
     try {
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ error: 'Project not found' });
@@ -635,7 +672,7 @@ app.post('/api/projects/:id/qr/exit', protect, async (req, res) => {
 });
 
 // 3. Scan Exit QR (Storekeeper)
-app.post('/api/projects/:id/scan/exit', protect, authorize('Founder', 'Manager', 'Storekeeper'), async (req, res) => {
+app.post('/api/projects/:id/scan/exit', protect, authorize('Founder', 'Manager', 'Storekeeper'), async (/** @type {AuthRequest} */ req, res) => {
     try {
         const { qrCode } = req.body;
         const project = await Project.findById(req.params.id);
@@ -714,7 +751,7 @@ app.post('/api/projects/:id/scan/return', protect, authorize('Founder', 'Manager
 });
 
 // 6. Finalize Return (Storekeeper) -> Points logic
-app.post('/api/projects/:id/return/finalize', protect, authorize('Founder', 'Manager', 'Storekeeper'), async (req, res) => {
+app.post('/api/projects/:id/return/finalize', protect, authorize('Founder', 'Manager', 'Storekeeper'), async (/** @type {AuthRequest} */ req, res) => {
     try {
         const { missingItems, brokenItems, cleanReturn } = req.body;
         // missingItems: [{ itemId, qty }]
@@ -841,7 +878,7 @@ app.get('/api/projects/:id/quote', async (req, res) => {
         const project = await Project.findById(req.params.id).populate('client');
         if (!project) return res.status(404).json({ error: 'Project not found' });
 
-        const companyId = req.query.company || 'bright';
+        const companyId = String(req.query.company || 'bright');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=quote-${project.eventName}.pdf`);
 
@@ -856,7 +893,7 @@ app.get('/api/projects/:id/invoice', async (req, res) => {
         const project = await Project.findById(req.params.id).populate('client');
         if (!project) return res.status(404).json({ error: 'Project not found' });
 
-        const companyId = req.query.company || 'bright';
+        const companyId = String(req.query.company || 'bright');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=invoice-${project.eventName}.pdf`);
 
@@ -886,7 +923,7 @@ app.get('/api/projects/:id/manifest', async (req, res) => {
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ error: 'Project not found' });
 
-        const companyId = req.query.company || 'bright';
+        const companyId = String(req.query.company || 'bright');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=manifest-${project.eventName}.pdf`);
 
@@ -901,7 +938,7 @@ app.get('/api/projects/:id/transport', async (req, res) => {
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ error: 'Project not found' });
 
-        const companyId = req.query.company || 'bright';
+        const companyId = String(req.query.company || 'bright');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=transport-${project.eventName}.pdf`);
 
@@ -916,7 +953,7 @@ app.get('/api/projects/:id/transfer', async (req, res) => {
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ error: 'Project not found' });
 
-        const companyId = req.query.company || 'bright';
+        const companyId = String(req.query.company || 'bright');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=transfer-${project.eventName}.pdf`);
 
@@ -947,7 +984,7 @@ app.post('/api/availability', async (req, res) => {
         const start = new Date(startDate);
         const end = new Date(endDate);
 
-        if (isNaN(start) || isNaN(end)) {
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
             return res.status(400).json({ error: 'Invalid dates' });
         }
 
@@ -989,7 +1026,7 @@ app.post('/api/availability', async (req, res) => {
             // If 'state' is not functional, entire stock might be compromised, but let's stick to qty logic for now if available.
             // If item.state is broken, maybe available is 0? 
             // User requirement: "ne pas disponible ... état matériel maintenance"
-            if (item.state !== 'Fonctionnel' && item.state !== 'Bon') {
+            if (item.state !== 'Fonctionnel') {
                 // If the main state is bad, assume 0 available? 
                 // Or just deduct maintenanceQuantity? 
                 // Let's assume maintenanceQuantity are broken parts.
@@ -1231,9 +1268,9 @@ app.put('/api/maintenance/:id/resolve', async (req, res) => {
         const ticket = await MaintenanceTicket.findById(req.params.id);
         if (!ticket) return res.status(404).json({ error: "Ticket not found" });
 
-        ticket.status = 'Resolved';
-        ticket.resolvedAt = new Date();
-        ticket.resolutionNotes = req.body.resolutionNotes || "Fixed";
+        ticket.status = 'Fixed';
+        ticket.dateResolved = new Date();
+        ticket.repairNotes = req.body.resolutionNotes || req.body.repairNotes || "Fixed";
         await ticket.save();
 
         // Optionally update item state back to Functional
@@ -1441,8 +1478,8 @@ app.get('/api/transfers/:id/pdf', async (req, res) => {
         if (!transfer) return res.status(404).json({ error: 'Transfer not found' });
 
         const data = {
-            sourceProjectName: transfer.sourceProject?.eventName || 'Unknown Source',
-            destProjectName: transfer.destinationProject?.eventName || 'Unknown Destination',
+            sourceProjectName: (/** @type {any} */ (transfer.sourceProject))?.eventName || 'Unknown Source',
+            destProjectName: (/** @type {any} */ (transfer.destinationProject))?.eventName || 'Unknown Destination',
             driverName: transfer.driverName,
             vehiclePlate: transfer.vehiclePlate,
             items: transfer.items,

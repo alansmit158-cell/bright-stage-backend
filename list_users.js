@@ -1,17 +1,21 @@
 const mongoose = require('mongoose');
+const User = require('./models/User');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
-const User = require('./models/User');
 
-const listUsers = async () => {
+async function listUsers() {
     try {
         await mongoose.connect(process.env.MONGODB_URI);
-        const users = await User.find({}, 'name email role');
-        console.log(users);
-        mongoose.connection.close();
-    } catch (err) {
-        console.error(err);
+        const users = await User.find({});
+        console.log(`Total users: ${users.length}`);
+        users.forEach(u => {
+            console.log(`- Name: ${u.name}, Email: ${u.email}, Role: ${u.role}, isActive: ${u.isActive}`);
+        });
+        mongoose.disconnect();
+    } catch (error) {
+        console.error('Error:', error);
+        mongoose.disconnect();
     }
-};
+}
 
 listUsers();

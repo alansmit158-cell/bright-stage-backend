@@ -10,6 +10,8 @@ const ProjectSchema = new mongoose.Schema({
 
     // Permissions (controlled by Storekeeper/Admin)
     permissions: {
+        locked: { type: Boolean, default: false },
+        unlockedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         canModifyEquipment: { type: Boolean, default: false },
         canModifyStaff: { type: Boolean, default: false }
     },
@@ -46,7 +48,7 @@ const ProjectSchema = new mongoose.Schema({
     // Workflow Status
     status: {
         type: String,
-        enum: ['Draft', 'Pickup', 'Return', 'Done'], // Simplified workflow
+        enum: ['Draft', 'Confirmed', 'Pickup', 'Return', 'Done'], // Simplified workflow
         default: 'Draft'
     },
     // Validation & Locking
@@ -54,12 +56,6 @@ const ProjectSchema = new mongoose.Schema({
         type: String,
         enum: ['Draft', 'Pending', 'Validated', 'Rejected'],
         default: 'Draft'
-    },
-    permissions: {
-        locked: { type: Boolean, default: false },
-        unlockedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        canModifyEquipment: { type: Boolean, default: false },
-        canModifyStaff: { type: Boolean, default: false }
     },
     logisticsStatus: {
         type: String,
