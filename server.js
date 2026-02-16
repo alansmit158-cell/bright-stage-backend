@@ -4,16 +4,21 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const http = require('http'); // Import HTTP
-const { Server } = require("socket.io"); // Import Socket.io
+const { protect, authorize } = require('./middleware/authMiddleware');
+const Attendance = require('./models/Attendance');
 const InventoryItem = require('./models/InventoryItem');
 const Project = require('./models/Project');
-const User = require('./models/User'); // Required for populate
+const User = require('./models/User');
 const MaintenanceTicket = require('./models/MaintenanceTicket');
-const PdfService = require('./services/PdfService');
-const Message = require('./models/Message'); // Import Message Model
 
-const { protect, authorize } = require('./middleware/authMiddleware');
-const Attendance = require('./models/Attendance'); // Import Attendance for Rest Check
+// Detect Vercel environment
+const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL;
+
+let io;
+if (!isVercel) {
+    const { Server } = require("socket.io");
+    // socket.io initialization moved below server creation
+}
 
 /**
  * @typedef {Object} AuthUser
@@ -67,10 +72,8 @@ app.use((req, res, next) => {
     next();
 });
 
-const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL;
-let io;
-
 if (!isVercel) {
+    const { Server } = require("socket.io");
     io = new Server(server, {
         cors: {
             origin: ["http://localhost:5173", "http://localhost:3000", "http://192.168.1.16:8081", "http://localhost:8081", "http://192.168.100.153:8081", "http://192.168.100.153:5173"],
@@ -78,6 +81,9 @@ if (!isVercel) {
             credentials: true
         }
     });
+
+    // Lazy load models/services needed for socket
+    const Message = require('./models/Message');
 
     // Socket.io Connection Logic
     io.on('connection', (socket) => {
@@ -109,15 +115,24 @@ if (!isVercel) {
 
 // Database Connection
 let lastDbError = null;
-mongoose.connect(process.env.MONGODB_URI, { family: 4 })
-    .then(() => {
+const connectDB = async () => {
+    if (mongoose.connection.readyState >= 1) return;
+
+    try {
+        await mongoose.connect(process.env.MONGODB_URI, {
+            family: 4,
+            serverSelectionTimeoutMS: 5000,
+        });
         console.log('MongoDB Connected');
         lastDbError = null;
-    })
-    .catch(err => {
+    } catch (err) {
         console.error('MongoDB Connection Error:', err);
         lastDbError = err.message;
-    });
+    }
+};
+
+// Start connection but don't block
+connectDB();
 
 mongoose.connection.on('error', err => {
     console.error('MongoDB runtime error:', err);
