@@ -88,6 +88,16 @@ router.delete('/:id', protect, authorize('Founder', 'Manager'), async (req, res)
     }
 });
 
+// Delete All Inventory Items
+router.delete('/all', protect, authorize('Founder'), async (req, res) => {
+    try {
+        await InventoryItem.deleteMany({});
+        res.json({ message: 'All inventory items deleted' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Report Issue
 router.post('/:id/report-issue', protect, async (req, res) => {
     const session = await mongoose.startSession();
