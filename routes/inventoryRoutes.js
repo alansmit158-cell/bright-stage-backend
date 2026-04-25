@@ -78,21 +78,21 @@ router.put('/:id', protect, authorize('Founder', 'Manager', 'Storekeeper'), asyn
     }
 });
 
-// Delete Inventory Item
-router.delete('/:id', protect, authorize('Founder', 'Manager'), async (req, res) => {
-    try {
-        await InventoryItem.findByIdAndDelete(req.params.id);
-        res.json({ message: 'Item deleted' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
 // Delete All Inventory Items
 router.delete('/all', protect, authorize('Founder'), async (req, res) => {
     try {
         await InventoryItem.deleteMany({});
         res.json({ message: 'All inventory items deleted' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Delete Inventory Item
+router.delete('/:id', protect, authorize('Founder', 'Manager'), async (req, res) => {
+    try {
+        await InventoryItem.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Item deleted' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
