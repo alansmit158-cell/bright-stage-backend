@@ -1,5 +1,6 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
+const path = require('path');
 
 class PdfService {
     constructor() {
@@ -45,15 +46,15 @@ class PdfService {
 
         // --- 1. HEADER (Logo Left, Info Right) ---
         try {
-            let logoPath = 'assets/logo.png';
+            let logoPath = path.join(__dirname, '../assets/logo.png');
             if (companyId === 'square') {
-                const squareLogo = 'assets/cropped-square-event-logo-02-1-e1704932051635.png';
-                logoPath = fs.existsSync(squareLogo) ? squareLogo : 'assets/square_logo.png';
+                logoPath = path.join(__dirname, '../assets/square_logo.png');
+                if (!fs.existsSync(logoPath)) logoPath = path.join(__dirname, '../assets/logo.png');
             }
             if (fs.existsSync(logoPath)) {
                 doc.image(logoPath, 40, 30, { width: 120 });
             }
-        } catch (e) {}
+        } catch (e) { console.error("Logo error:", e); }
 
         doc.fontSize(9).font("Helvetica-Bold");
         const headerX = 350;
@@ -189,12 +190,15 @@ class PdfService {
         
         // Centered Footer Logo
         try {
-            let logoPath = 'assets/logo.png';
-            if (companyId === 'square') { logoPath = 'assets/cropped-square-event-logo-02-1-e1704932051635.png'; }
+            let logoPath = path.join(__dirname, '../assets/logo.png');
+            if (companyId === 'square') { 
+                logoPath = path.join(__dirname, '../assets/square_logo.png');
+                if (!fs.existsSync(logoPath)) logoPath = path.join(__dirname, '../assets/logo.png');
+            }
             if (fs.existsSync(logoPath)) {
                 doc.image(logoPath, 275, footerY, { width: 50 });
             }
-        } catch(e) {}
+        } catch(e) { console.error("Logo error:", e); }
 
         doc.fontSize(8).fillColor("#64748b").font("Helvetica");
         doc.text(info.address, 0, footerY + 55, { align: 'center' });
@@ -227,15 +231,15 @@ class PdfService {
 
         // --- 1. HEADER ---
         try {
-            let logoPath = 'assets/logo.png';
+            let logoPath = path.join(__dirname, '../assets/logo.png');
             if (companyId === 'square') {
-                const squareLogo = 'assets/cropped-square-event-logo-02-1-e1704932051635.png';
-                logoPath = fs.existsSync(squareLogo) ? squareLogo : 'assets/square_logo.png';
+                logoPath = path.join(__dirname, '../assets/square_logo.png');
+                if (!fs.existsSync(logoPath)) logoPath = path.join(__dirname, '../assets/logo.png');
             }
             if (fs.existsSync(logoPath)) {
                 doc.image(logoPath, 40, 30, { width: 120 });
             }
-        } catch (e) {}
+        } catch (e) { console.error("Logo error:", e); }
 
         doc.fontSize(9).font("Helvetica-Bold");
         const headerX = 350;
@@ -345,12 +349,15 @@ class PdfService {
         doc.moveTo(40, footerY - 10).lineTo(555, footerY - 10).strokeColor("#e2e8f0").stroke();
         
         try {
-            let logoPath = 'assets/logo.png';
-            if (companyId === 'square') { logoPath = 'assets/cropped-square-event-logo-02-1-e1704932051635.png'; }
+            let logoPath = path.join(__dirname, '../assets/logo.png');
+            if (companyId === 'square') { 
+                logoPath = path.join(__dirname, '../assets/square_logo.png');
+                if (!fs.existsSync(logoPath)) logoPath = path.join(__dirname, '../assets/logo.png');
+            }
             if (fs.existsSync(logoPath)) {
                 doc.image(logoPath, 275, footerY, { width: 50 });
             }
-        } catch(e) {}
+        } catch(e) { console.error("Logo error:", e); }
 
         doc.fontSize(8).fillColor("#64748b").font("Helvetica");
         doc.text(info.address, 0, footerY + 55, { align: 'center' });
@@ -583,20 +590,17 @@ class PdfService {
         }
 
         try {
-            let logoPath = 'assets/logo.png';
+            let logoPath = path.join(__dirname, '../assets/logo.png');
             if (companyId === 'square') {
-                const squareLogo = 'assets/cropped-square-event-logo-02-1-e1704932051635.png';
-                logoPath = fs.existsSync(squareLogo) ? squareLogo : 'assets/square_logo.png';
+                logoPath = path.join(__dirname, '../assets/square_logo.png');
+                if (!fs.existsSync(logoPath)) logoPath = path.join(__dirname, '../assets/logo.png');
             }
 
             if (fs.existsSync(logoPath)) {
                 doc.image(logoPath, 50, 45, { width: 50 });
-            } else if (companyId === 'square' && fs.existsSync('assets/logo.png')) {
-                // Fallback to default logo if square logo doesn't exist
-                doc.image('assets/logo.png', 50, 45, { width: 50 });
             }
         } catch (e) {
-            // Ignore missing logo
+            console.error("Logo error:", e);
         }
         doc.fontSize(20).text(info.name, 110, 50);
         doc.fontSize(10).text(info.email, 200, 65, { align: 'right' });
@@ -604,11 +608,12 @@ class PdfService {
         doc.fontSize(16).text(String(title), 50, 100);
     }
 
-    generateDeliveryNote(note, stream, companyId = 'bright', customSettings = null) {
+    generateDeliveryNote(note, stream, companyId = 'bright', customSettings = null, isReturn = false) {
         const doc = new PDFDocument({ margin: 50 });
         doc.pipe(stream);
 
-        this.generateHeader(doc, "BON DE LIVRAISON", companyId, customSettings);
+        const title = isReturn ? "BON DE RETOUR" : "BON DE LIVRAISON";
+        this.generateHeader(doc, title, companyId, customSettings);
 
         // BL Number & Date
         doc.fontSize(10).font("Helvetica-Bold").text(`Nº: ${note.number}`, 400, 100);

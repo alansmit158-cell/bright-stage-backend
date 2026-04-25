@@ -174,8 +174,9 @@ router.get('/:id/pdf', protect, checkProjectAccess,
         const settings = await CompanySettings.findOne({ companyKey: companyId });
 
         const PdfService = require('../services/PdfService');
+        const isReturn = req.query.type === 'return';
         // PdfService already handles null note.project safely using optional chaining
-        PdfService.generateDeliveryNote(note, res, companyId, settings);
+        PdfService.generateDeliveryNote(note, res, companyId, settings, isReturn);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
