@@ -263,7 +263,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
                 model: row['Model'] || row['Model / Reference'] || row['Modèle'] || ''
             });
 
-            const quantity = parseInt(row['Qty'] || row['Quantité'] || row['Qte'] || row['QTE'] || 0) || 0;
+            const quantity = parseInt(row['Qty'] || row['Quantité'] || row['Qte'] || row['QTE'] || row['Stock'] || row['Stock Total'] || row['Nombre'] || row['Amount'] || 0) || 0;
 
             if (existingItem) {
                 existingItem.quantity += quantity;
