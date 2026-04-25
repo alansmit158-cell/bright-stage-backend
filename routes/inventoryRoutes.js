@@ -99,6 +99,10 @@ router.delete('/:id', protect, authorize('Founder', 'Manager'), async (req, res)
 });
 
 // Report Issue
+/**
+ * @param {AuthRequest} req
+ * @param {import('express').Response} res
+ */
 router.post('/:id/report-issue', protect, async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -164,8 +168,8 @@ router.get('/availability', async (req, res) => {
         const { itemId, start, end } = req.query;
         if (!itemId || !start || !end) return res.status(400).json({ error: "Missing params" });
 
-        const startDate = new Date(start);
-        const endDate = new Date(end);
+        const startDate = new Date(String(start));
+        const endDate = new Date(String(end));
 
         const item = await InventoryItem.findById(itemId);
         if (!item) return res.status(404).json({ error: "Item not found" });
