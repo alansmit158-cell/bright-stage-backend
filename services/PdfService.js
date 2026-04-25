@@ -609,71 +609,196 @@ class PdfService {
     }
 
     generateDeliveryNote(note, stream, companyId = 'bright', customSettings = null, isReturn = false) {
-        const doc = new PDFDocument({ margin: 50 });
+        const doc = new PDFDocument({ margin: 40 });
         doc.pipe(stream);
 
-        const title = isReturn ? "BON DE RETOUR" : "BON DE LIVRAISON";
-        this.generateHeader(doc, title, companyId, customSettings);
+        let info = this.companies[companyId] || this.companies.bright;
+        if (customSettings) {
+            info = {
+                name: customSettings.companyName || info.name,
+                address: customSettings.address?.street || info.address,
+                phone: customSettings.phone || info.phone,
+                email: customSettings.email || info.email,
+                website: customSettings.website || info.website,
+                taxId: customSettings.taxId || info.taxId
+            };
+        }
 
-        // BL Number & Date
-        doc.fontSize(10).font("Helvetica-Bold").text(`Nº: ${note.number}`, 400, 100);
-        doc.font("Helvetica").text(`Date: ${new Date(note.date).toLocaleDateString('fr-FR')}`, 400, 115);
-
-        // Project / Client Info
-        doc.fontSize(10).font("Helvetica-Bold").text("Projet / Chantier:", 50, 130);
-        doc.font("Helvetica").text(note.project?.eventName || 'N/A');
-        doc.text(note.project?.siteName || '');
-        doc.text(note.project?.siteAddress || '');
-        doc.moveDown();
-
-        // Transport & Carrier Info
-        const boxY = 190;
-        doc.rect(50, boxY, 500, 80).stroke();
-        doc.font("Helvetica-Bold").text("Informations Transporteur / Chauffeur", 60, boxY + 10);
-        doc.font("Helvetica");
-        doc.text(`Nom: ${note.driverName || '-'}`, 60, boxY + 30);
-        doc.text(`Tél: ${note.driverPhone || '-'}`, 60, boxY + 45);
-        doc.text(`CIN: ${note.driverCin || '-'}`, 60, boxY + 60);
-
-        doc.text(`Véhicule: ${note.vehicleModel || '-'}`, 300, boxY + 30);
-        doc.text(`Matricule: ${note.vehiclePlate || '-'}`, 300, boxY + 45);
-
-        // Items Table
-        const tableTop = 290;
-        doc.font("Helvetica-Bold");
-        doc.text("Désignation / Item", 50, tableTop);
-        doc.text("Quantité / Qty", 450, tableTop);
-        doc.font("Helvetica");
-
-        let y = tableTop + 20;
-        doc.moveTo(50, y - 5).lineTo(550, y - 5).stroke();
-
-        (note.items || []).forEach(item => {
-            if (y > 700) {
-                doc.addPage();
-                y = 50;
-                doc.font("Helvetica-Bold");
-                doc.text("Désignation / Item", 50, y);
-                doc.text("Quantité / Qty", 450, y);
-                doc.font("Helvetica");
-                y += 20;
+        // --- 1. HEADER ---
+        try {
+            let logoPath = path.join(__dirname, '../assets/logo.png');
+            if (companyId === 'square') {
+                logoPath = path.join(__dirname, '../assets/square_logo.png');
+                if (!fs.existsSync(logoPath)) logoPath = path.join(__dirname, '../assets/logo.png');
             }
-            doc.text(item.name || '-', 50, y);
-            doc.text(String(item.quantity || 0), 450, y);
-            y += 20;
+            if (fs.existsSync(logoPath)) {
+                doc.image(logoPath, 40, 40, { width: 140 }); // Slightly larger logo
+            }
+        } catch (e) { console.error("Logo error:", e); }
+
+        // Company Details Right Aligned
+        doc.fontSize(10).font("Helvetica-Bold").fillColor("#1e293b");
+        const headerX = 350;
+        doc.text(info.name, headerX, 40, { width: 200, align: 'right' });
+        doc.font("Helvetica").fontSize(9).fillColor("#334155");
+        
+        // Handle address split by comma for better layout like screenshot
+        const addressParts = info.address.split(',');
+        if (addressParts.length > 1) {
+            doc.text(addressParts[0].trim(), headerX, 55, { width: 200, align: 'right' });
+            doc.text(addressParts[1].trim(), headerX, 68, { width: 200, align: 'right' });
+            doc.text("Tunisia", headerX, 81, { width: 200, align: 'right' });
+        } else {
+            doc.text(info.address, headerX, 55, { width: 200, align: 'right' });
+            doc.text("Tunisia", headerX, 68, { width: 200, align: 'right' });
+        }
+        
+        doc.text(info.phone, headerX, 94, { width: 200, align: 'right' });
+        doc.text(info.email, headerX, 107, { width: 200, align: 'right' });
+        if (info.website) {
+            doc.text(info.website, headerX, 120, { width: 200, align: 'right' });
+        }
+
+        // --- 2. TITLE ---
+        const titleY = 160;
+        const titleText = isReturn ? "BON DE RETOUR" : "BON DE LIVRAISON";
+        doc.font("Helvetica").fontSize(15).fillColor("#1e293b");
+        const textWidth = doc.widthOfString(titleText);
+        const textX = (doc.page.width - textWidth) / 2;
+        doc.text(titleText, textX, titleY);
+
+        doc.lineWidth(1).strokeColor("#e2e8f0");
+        doc.moveTo(40, titleY + 8).lineTo(textX - 15, titleY + 8).stroke();
+        doc.moveTo(textX + textWidth + 15, titleY + 8).lineTo(555, titleY + 8).stroke();
+
+
+        // --- 3. CLIENT INFO & DETAILS BOX ---
+        const infoY = 210;
+        const leftCol = 40;
+        const rightCol = 340;
+
+        // Facturer à
+        doc.font("Helvetica").fontSize(9).fillColor("#475569");
+        doc.text("Facturer à", leftCol, infoY);
+        doc.font("Helvetica-Bold").fontSize(10).fillColor("#1e293b");
+        doc.text(note.project?.client?.name || note.project?.eventName || 'Client Inconnu', leftCol, infoY + 15, { width: 250 });
+        
+        // The Details Box
+        doc.lineWidth(1).strokeColor("#e2e8f0");
+        doc.rect(rightCol, infoY, 215, 60).stroke();
+        doc.moveTo(rightCol + 100, infoY).lineTo(rightCol + 100, infoY + 60).stroke();
+        doc.moveTo(rightCol, infoY + 30).lineTo(rightCol + 215, infoY + 30).stroke();
+        
+        doc.rect(rightCol, infoY, 100, 30).fill("#f8fafc");
+        doc.rect(rightCol, infoY + 30, 100, 30).fill("#f8fafc");
+        
+        doc.rect(rightCol, infoY, 215, 60).stroke(); 
+        doc.moveTo(rightCol + 100, infoY).lineTo(rightCol + 100, infoY + 60).stroke();
+        doc.moveTo(rightCol, infoY + 30).lineTo(rightCol + 215, infoY + 30).stroke();
+        
+        doc.fillColor("#475569").fontSize(8).font("Helvetica");
+        doc.text("N° de commande client", rightCol + 5, infoY + 10);
+        doc.text("Date d'expédition prévue", rightCol + 5, infoY + 40);
+
+        doc.fillColor("#1e293b").fontSize(9).font("Helvetica");
+        doc.text(note.number, rightCol + 105, infoY + 10);
+        doc.text(new Date(note.date).toLocaleDateString('fr-FR'), rightCol + 105, infoY + 40);
+
+        doc.rect(rightCol, infoY + 70, 215, 20).stroke();
+        doc.rect(rightCol, infoY + 70, 100, 20).fill("#f8fafc");
+        doc.rect(rightCol, infoY + 70, 215, 20).stroke();
+        doc.moveTo(rightCol + 100, infoY + 70).lineTo(rightCol + 100, infoY + 90).stroke();
+        
+        doc.fillColor("#475569").fontSize(8).font("Helvetica");
+        doc.text("Jours de Travail", rightCol + 5, infoY + 76);
+        doc.fillColor("#1e293b").fontSize(9).font("Helvetica");
+        doc.text("1", rightCol + 105, infoY + 76);
+
+        // Address & Driver below Facturer à
+        const addrY = infoY + 70;
+        doc.fillColor("#475569").fontSize(9).font("Helvetica");
+        doc.text(`Adresse: ${note.project?.siteAddress || '-'}`, leftCol, addrY);
+        doc.text(`Chauffeure: ${note.driverName || '-'}`, leftCol, addrY + 15);
+        doc.text(`CIN: ${note.driverCin || '-'}`, leftCol, addrY + 30);
+        doc.text(`Véhicule: ${note.vehiclePlate || '-'}`, leftCol, addrY + 45);
+
+        // --- 4. ITEMS TABLE ---
+        const tableTop = addrY + 80;
+        const col1 = 40;  
+        const col2 = 80;  
+        const col3 = 450; 
+        
+        doc.rect(col1, tableTop, 515, 25).fill("#f1f5f9");
+        doc.rect(col1, tableTop, 515, 25).strokeColor("#e2e8f0").stroke(); 
+        doc.moveTo(col3, tableTop).lineTo(col3, tableTop + 25).strokeColor("#e2e8f0").stroke(); 
+
+        doc.fillColor("#334155").font("Helvetica").fontSize(9);
+        doc.text("#", col1 + 10, tableTop + 8);
+        doc.text("Article & Description", col2, tableTop + 8);
+        doc.text("Quantité", col3 + 10, tableTop + 8);
+
+        let y = tableTop + 25;
+
+        (note.items || []).forEach((item, index) => {
+            const lines = (item.name || '-').split('\n');
+            const rowHeight = Math.max(30, 20 + lines.length * 12);
+            
+            if (y + rowHeight > 750) {
+                doc.addPage();
+                y = 40;
+                doc.rect(col1, y, 515, 25).fill("#f1f5f9");
+                doc.rect(col1, y, 515, 25).strokeColor("#e2e8f0").stroke();
+                doc.moveTo(col3, y).lineTo(col3, y + 25).strokeColor("#e2e8f0").stroke();
+                doc.fillColor("#334155").font("Helvetica").fontSize(9);
+                doc.text("#", col1 + 10, y + 8);
+                doc.text("Article & Description", col2, y + 8);
+                doc.text("Quantité", col3 + 10, y + 8);
+                y += 25;
+            }
+
+            doc.rect(col1, y, 515, rowHeight).strokeColor("#e2e8f0").stroke();
+            doc.moveTo(col3, y).lineTo(col3, y + rowHeight).strokeColor("#e2e8f0").stroke();
+
+            doc.fillColor("#475569").fontSize(9).font("Helvetica");
+            doc.text(String(index + 1), col1 + 10, y + 10);
+            
+            doc.fillColor("#1e293b").fontSize(9);
+            doc.font("Helvetica").text(lines[0], col2, y + 10);
+            
+            if (lines.length > 1) {
+                doc.font("Helvetica").fillColor("#94a3b8").fontSize(8);
+                let currentY = y + 24;
+                for (let i = 1; i < lines.length; i++) {
+                    doc.text(lines[i], col2, currentY);
+                    currentY += 12;
+                }
+            }
+            
+            doc.font("Helvetica").fillColor("#1e293b").fontSize(9);
+            const rawQty = Number(item.quantity) || 0;
+            const qtyStr = Number.isInteger(rawQty) ? rawQty.toFixed(2) : String(rawQty);
+            doc.text(qtyStr, col3 - 10, y + 10, { align: 'right', width: 60 });
+            
+            let unit = 'pcs';
+            const lowerName = lines[0].toLowerCase();
+            if (lowerName.includes('structure') || lowerName.includes('cable') || lowerName.includes('mètre') || lowerName.includes('metre')) {
+                unit = 'm';
+            } else if (lowerName.includes('liquide')) {
+                unit = 'L';
+            }
+            doc.fillColor("#94a3b8").fontSize(8);
+            doc.text(unit, col3 - 10, y + 22, { align: 'right', width: 60 });
+
+            y += rowHeight;
         });
 
-        // Signatures
-        const footerY = Math.max(y + 40, 650);
-        doc.font("Helvetica-Bold");
-        doc.text("Cachet et Signature Magasin", 50, footerY);
-        doc.text("Signature Chauffeur / Client", 350, footerY);
-
-        doc.rect(50, footerY + 15, 200, 60).stroke();
-        doc.rect(350, footerY + 15, 200, 60).stroke();
-
         if (note.notes) {
-            doc.fontSize(10).font("Helvetica-Oblique").text(`Notes: ${note.notes}`, 50, footerY - 30);
+            y += 20;
+            if (y > 750) { doc.addPage(); y = 40; }
+            doc.font("Helvetica-Bold").fillColor("#1e293b").fontSize(10);
+            doc.text("Notes:", col1, y);
+            doc.font("Helvetica").fillColor("#475569").fontSize(9);
+            doc.text(note.notes, col1, y + 15, { width: 515 });
         }
 
         doc.end();
