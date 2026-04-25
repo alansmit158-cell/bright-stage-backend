@@ -260,10 +260,10 @@ router.post('/import', upload.single('file'), async (req, res) => {
 
             const existingItem = await InventoryItem.findOne({
                 name: name,
-                model: row['Model'] || ''
+                model: row['Model'] || row['Model / Reference'] || row['Modèle'] || ''
             });
 
-            const quantity = parseInt(row['Qty'] || row['Quantité'] || 0) || 0;
+            const quantity = parseInt(row['Qty'] || row['Quantité'] || row['Qte'] || row['QTE'] || 0) || 0;
 
             if (existingItem) {
                 existingItem.quantity += quantity;
@@ -273,13 +273,13 @@ router.post('/import', upload.single('file'), async (req, res) => {
                 const newItem = new InventoryItem({
                     name: name,
                     brand: row['Brand'] || row['Marque'] || 'Generic',
-                    model: row['Model'] || '',
+                    model: row['Model'] || row['Model / Reference'] || row['Modèle'] || '',
                     category: row['Category'] || row['Catégorie'] || 'Accessoires structure',
                     quantity: quantity,
                     state: 'Fonctionnel',
                     barcode: row['Barcode'] || `GEN-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                     storageLocation: {
-                        zone: row['Zone'] || 'A',
+                        zone: row['Zone'] || row['Storage'] || 'A',
                         shelving: row['Shelving'] || '1',
                         shelf: row['Shelf'] || '1'
                     }
