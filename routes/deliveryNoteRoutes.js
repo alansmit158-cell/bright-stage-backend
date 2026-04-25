@@ -121,6 +121,7 @@ router.post('/', protect, checkProjectAccess,
      */
     async (req, res) => {
     try {
+        console.log("POST /delivery-notes - body:", JSON.stringify(req.body, null, 2));
         const newNote = new DeliveryNote({
             ...req.body,
             createdBy: req.user._id
@@ -128,6 +129,7 @@ router.post('/', protect, checkProjectAccess,
         const saved = await newNote.save();
         res.status(201).json(saved);
     } catch (err) {
+        console.error("POST /delivery-notes - error:", err);
         res.status(400).json({ error: err.message });
     }
 });
@@ -135,9 +137,11 @@ router.post('/', protect, checkProjectAccess,
 // UPDATE
 router.put('/:id', protect, checkProjectAccess, async (req, res) => {
     try {
+        console.log(`PUT /delivery-notes/${req.params.id} - body:`, JSON.stringify(req.body, null, 2));
         const updated = await DeliveryNote.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.json(updated);
     } catch (err) {
+        console.error("PUT /delivery-notes - error:", err);
         res.status(400).json({ error: err.message });
     }
 });
