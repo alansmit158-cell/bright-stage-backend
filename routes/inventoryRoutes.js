@@ -255,7 +255,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
         let updatedCount = 0;
 
         for (const row of data) {
-            const name = row['Name'] || row['Nom'];
+            const name = row['Name'] || row['Nom'] || row['DESIGNATION'] || row['Designation'];
             if (!name) continue;
 
             const existingItem = await InventoryItem.findOne({
@@ -263,7 +263,8 @@ router.post('/import', upload.single('file'), async (req, res) => {
                 model: row['Model'] || row['Model / Reference'] || row['Modèle'] || ''
             });
 
-            const quantity = parseInt(row['Qty'] || row['Quantité'] || row['Qte'] || row['QTE'] || row['Stock'] || row['Stock Total'] || row['Nombre'] || row['Amount'] || 0) || 0;
+            console.log("DEBUG: Processing Excel Row:", JSON.stringify(row));
+            const quantity = Number(row['Qty'] || row['Quantité'] || row['Qte'] || row['QTE'] || row['Stock'] || row['Stock Total'] || row['Nombre'] || row['Amount'] || 0) || 0;
 
             if (existingItem) {
                 existingItem.quantity += quantity;

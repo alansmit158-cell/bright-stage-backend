@@ -609,8 +609,13 @@ class PdfService {
     }
 
     generateDeliveryNote(note, stream, companyId = 'bright', customSettings = null, isReturn = false) {
+        console.log("DEBUG: PdfService.generateDeliveryNote - note:", JSON.stringify(note, null, 2));
         const doc = new PDFDocument({ margin: 40 });
         doc.pipe(stream);
+        
+        const noteData = note.toObject ? note.toObject() : note;
+        const items = noteData.items || [];
+        console.log("DEBUG: PdfService.generateDeliveryNote - items count:", items.length);
 
         let info = this.companies[companyId] || this.companies.bright;
         if (customSettings) {
@@ -681,7 +686,7 @@ class PdfService {
         doc.font("Helvetica").fontSize(9).fillColor("#475569");
         doc.text("Facturer à", leftCol, infoY);
         doc.font("Helvetica-Bold").fontSize(10).fillColor("#1e293b");
-        doc.text(note.project?.client?.name || note.project?.eventName || 'Client Inconnu', leftCol, infoY + 15, { width: 250 });
+        doc.text(noteData.project?.client?.name || noteData.project?.eventName || 'Client Inconnu', leftCol, infoY + 15, { width: 250 });
         
         // The Details Box
         doc.lineWidth(1).strokeColor("#e2e8f0");
@@ -705,8 +710,8 @@ class PdfService {
         doc.text("Date de retour", rightCol + 5, infoY + 8 + rowHeight * 2);
         doc.text("Jours de Travail", rightCol + 5, infoY + 8 + rowHeight * 3);
 
-        const returnDateVal = note.returnDate ? new Date(note.returnDate) : (note.project?.dates?.end ? new Date(note.project.dates.end) : null);
-        const dispatchDateVal = new Date(note.date);
+        const returnDateVal = noteData.returnDate ? new Date(noteData.returnDate) : (noteData.project?.dates?.end ? new Date(noteData.project.dates.end) : null);
+        const dispatchDateVal = new Date(noteData.date);
         
         let days = 1;
         if (returnDateVal) {
@@ -715,7 +720,7 @@ class PdfService {
         }
 
         doc.fillColor("#1e293b").fontSize(9).font("Helvetica");
-        doc.text(note.number, rightCol + 105, infoY + 8);
+        doc.text(noteData.number, rightCol + 105, infoY + 8);
         doc.text(dispatchDateVal.toLocaleDateString('fr-FR'), rightCol + 105, infoY + 8 + rowHeight);
         doc.text(returnDateVal ? returnDateVal.toLocaleDateString('fr-FR') : '-', rightCol + 105, infoY + 8 + rowHeight * 2);
         doc.text(String(days), rightCol + 105, infoY + 8 + rowHeight * 3);
@@ -723,10 +728,10 @@ class PdfService {
         // Address & Driver below Facturer à (adjusted Y based on details box)
         const addrY = infoY + rowHeight * 4 + 10;
         doc.fillColor("#475569").fontSize(9).font("Helvetica");
-        doc.text(`Adresse: ${note.project?.siteAddress || '-'}`, leftCol, addrY);
-        doc.text(`Chauffeure: ${note.driverName || '-'}`, leftCol, addrY + 15);
-        doc.text(`CIN: ${note.driverCin || '-'}`, leftCol, addrY + 30);
-        doc.text(`Véhicule: ${note.vehiclePlate || '-'}`, leftCol, addrY + 45);
+        doc.text(`Adresse: ${noteData.project?.siteAddress || '-'}`, leftCol, addrY);
+        doc.text(`Chauffeure: ${noteData.driverName || '-'}`, leftCol, addrY + 15);
+        doc.text(`CIN: ${noteData.driverCin || '-'}`, leftCol, addrY + 30);
+        doc.text(`Véhicule: ${noteData.vehiclePlate || '-'}`, leftCol, addrY + 45);
 
         // --- 4. ITEMS TABLE ---
         const tableTop = addrY + 80;
@@ -745,7 +750,7 @@ class PdfService {
 
         let y = tableTop + 25;
 
-        (note.items || []).forEach((item, index) => {
+        items.forEach((item, index) => {
             const lines = (item.name || '-').split('\n');
             const rowHeight = Math.max(30, 20 + lines.length * 12);
             
