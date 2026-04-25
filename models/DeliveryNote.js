@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const DeliveryNoteSchema = new mongoose.Schema({
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' }, // Optional now
     date: { type: Date, default: Date.now },
+    returnDate: { type: Date },
     number: { type: String, unique: true }, // BL-YYYY-XXXX
     isIndividual: { type: Boolean, default: false }, // Flag for project-less BLs
 

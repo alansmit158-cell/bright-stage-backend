@@ -685,37 +685,43 @@ class PdfService {
         
         // The Details Box
         doc.lineWidth(1).strokeColor("#e2e8f0");
-        doc.rect(rightCol, infoY, 215, 60).stroke();
-        doc.moveTo(rightCol + 100, infoY).lineTo(rightCol + 100, infoY + 60).stroke();
-        doc.moveTo(rightCol, infoY + 30).lineTo(rightCol + 215, infoY + 30).stroke();
         
-        doc.rect(rightCol, infoY, 100, 30).fill("#f8fafc");
-        doc.rect(rightCol, infoY + 30, 100, 30).fill("#f8fafc");
+        // Background for first column (4 rows = 100 height)
+        const rowHeight = 25;
+        doc.rect(rightCol, infoY, 100, rowHeight * 4).fill("#f8fafc");
         
-        doc.rect(rightCol, infoY, 215, 60).stroke(); 
-        doc.moveTo(rightCol + 100, infoY).lineTo(rightCol + 100, infoY + 60).stroke();
-        doc.moveTo(rightCol, infoY + 30).lineTo(rightCol + 215, infoY + 30).stroke();
+        // Borders
+        doc.rect(rightCol, infoY, 215, rowHeight * 4).stroke(); 
+        doc.moveTo(rightCol + 100, infoY).lineTo(rightCol + 100, infoY + rowHeight * 4).stroke();
         
-        doc.fillColor("#475569").fontSize(8).font("Helvetica");
-        doc.text("N° de commande client", rightCol + 5, infoY + 10);
-        doc.text("Date d'expédition prévue", rightCol + 5, infoY + 40);
-
-        doc.fillColor("#1e293b").fontSize(9).font("Helvetica");
-        doc.text(note.number, rightCol + 105, infoY + 10);
-        doc.text(new Date(note.date).toLocaleDateString('fr-FR'), rightCol + 105, infoY + 40);
-
-        doc.rect(rightCol, infoY + 70, 215, 20).stroke();
-        doc.rect(rightCol, infoY + 70, 100, 20).fill("#f8fafc");
-        doc.rect(rightCol, infoY + 70, 215, 20).stroke();
-        doc.moveTo(rightCol + 100, infoY + 70).lineTo(rightCol + 100, infoY + 90).stroke();
+        // Horizontal lines between rows
+        for(let i = 1; i < 4; i++) {
+            doc.moveTo(rightCol, infoY + rowHeight * i).lineTo(rightCol + 215, infoY + rowHeight * i).stroke();
+        }
         
         doc.fillColor("#475569").fontSize(8).font("Helvetica");
-        doc.text("Jours de Travail", rightCol + 5, infoY + 76);
-        doc.fillColor("#1e293b").fontSize(9).font("Helvetica");
-        doc.text("1", rightCol + 105, infoY + 76);
+        doc.text("N° de commande client", rightCol + 5, infoY + 8);
+        doc.text("Date d'expédition", rightCol + 5, infoY + 8 + rowHeight);
+        doc.text("Date de retour", rightCol + 5, infoY + 8 + rowHeight * 2);
+        doc.text("Jours de Travail", rightCol + 5, infoY + 8 + rowHeight * 3);
 
-        // Address & Driver below Facturer à
-        const addrY = infoY + 70;
+        const returnDateVal = note.returnDate ? new Date(note.returnDate) : (note.project?.dates?.end ? new Date(note.project.dates.end) : null);
+        const dispatchDateVal = new Date(note.date);
+        
+        let days = 1;
+        if (returnDateVal) {
+            const diffTime = Math.abs(returnDateVal - dispatchDateVal);
+            days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end days
+        }
+
+        doc.fillColor("#1e293b").fontSize(9).font("Helvetica");
+        doc.text(note.number, rightCol + 105, infoY + 8);
+        doc.text(dispatchDateVal.toLocaleDateString('fr-FR'), rightCol + 105, infoY + 8 + rowHeight);
+        doc.text(returnDateVal ? returnDateVal.toLocaleDateString('fr-FR') : '-', rightCol + 105, infoY + 8 + rowHeight * 2);
+        doc.text(String(days), rightCol + 105, infoY + 8 + rowHeight * 3);
+
+        // Address & Driver below Facturer à (adjusted Y based on details box)
+        const addrY = infoY + rowHeight * 4 + 10;
         doc.fillColor("#475569").fontSize(9).font("Helvetica");
         doc.text(`Adresse: ${note.project?.siteAddress || '-'}`, leftCol, addrY);
         doc.text(`Chauffeure: ${note.driverName || '-'}`, leftCol, addrY + 15);
